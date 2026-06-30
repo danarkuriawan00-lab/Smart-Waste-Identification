@@ -359,14 +359,32 @@
     </div>
 
 <script type="text/javascript">
-    const URL = "https://teachablemachine.withgoogle.com/models/YwSIagLlK/"; 
+    // MODEL BARU ANDA SUDAH TERPASANG DI SINI
+    const URL = "https://teachablemachine.withgoogle.com/models/Rmy4hQmVN/"; 
     let model, webcam, hasilContainer, maxPredictions;
     let isCameraRunning = false;
+    let animationFrameId; 
     
     let terakhirDiucapkan = "";
     let waktuBicaraTerakhir = 0;
 
-    function showView(viewName, element) {
+    async function showView(viewName, element) {
+        window.speechSynthesis.cancel();
+        terakhirDiucapkan = "";
+
+        if (viewName !== 'scan' && isCameraRunning && webcam) {
+            try {
+                cancelAnimationFrame(animationFrameId); 
+                await webcam.stop(); 
+                isCameraRunning = false;
+                document.getElementById("webcam-container").innerHTML = ""; 
+                document.getElementById("hasil-scan").innerHTML = "Membuka Kamera...";
+                document.getElementById("hasil-scan").className = "";
+            } catch(e) {
+                console.log("Kamera berhenti.");
+            }
+        }
+
         document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active-view'));
         document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
         
@@ -390,7 +408,7 @@
             webcam = new tmImage.Webcam(280, 280, false); 
             await webcam.setup({ facingMode: "environment" }); 
             await webcam.play();
-            window.requestAnimationFrame(loop);
+            animationFrameId = window.requestAnimationFrame(loop);
 
             document.getElementById("webcam-container").innerHTML = "";
             document.getElementById("webcam-container").appendChild(webcam.canvas);
@@ -403,12 +421,14 @@
     }
 
     async function loop() {
+        if (!isCameraRunning) return; 
         webcam.update(); 
         await predict();
-        window.requestAnimationFrame(loop);
+        animationFrameId = window.requestAnimationFrame(loop);
     }
 
     function keluarkanSuara(teks) {
+        if (!isCameraRunning) return; 
         const waktuSekarang = Date.now();
         if (teks !== terakhirDiucapkan || (waktuSekarang - waktuBicaraTerakhir > 4000)) {
             window.speechSynthesis.cancel();
@@ -422,6 +442,7 @@
     }
 
     async function predict() {
+        if (!isCameraRunning) return;
         const prediction = await model.predict(webcam.canvas);
         let bestMatch = { name: "", score: 0 };
 

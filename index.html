@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smart Waste Identification - SDN Gondang 1</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+    <style>
+        :root {
+            --primary-green: #2e7d32;
+            --gradient-green: linear-gradient(135deg, #2e7d32, #4caf50);
+            --light-green: #e8f5e9;
+            --bg-color: #f4f7f4;
+            --dark-text: #1b3a1e;
+            --organic: #4caf50;
+            --anorganic: #2196f3;
+            --b3: #f44336;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+            background-color: #d0d7d0;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 412px;
+            background-color: var(--bg-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            padding-top: 90px; 
+            padding-bottom: 95px; 
+            overflow-x: hidden;
+            box-sizing: border-box;
+        }
+
+        /* HEADER */
+        .app-header {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(46, 125, 50, 0.08);
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(46, 125, 50, 0.03);
+        }
+        
+        .status-bar-mock {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 20px 0;
+            font-size: 11px;
+            color: #777;
+            font-weight: 600;
+        }
+
+        .header-main {
+            display: flex;
+            align-items: center;
+            padding: 10px 20px 14px;
+        }
+        .header-logo { 
+            font-size: 26px; 
+            margin-right: 12px;
+            background: var(--light-green);
+            padding: 6px;
+            border-radius: 12px;
+        }
+        .header-text h1 { font-size: 15px; margin: 0; color: var(--primary-green); font-weight: 800; letter-spacing: -0.2px; }
+        .header-text p { font-size: 11px; margin: 2px 0 0; color: #666; font-weight: 600; }
+
+        /* VIEW SECTIONS */
+        .view-section {
+            display: none; 
+            padding: 20px;
+            flex-direction: column;
+            animation: slideUp 0.35s cubic-bezier(0.1, 1, 0.1, 1);
+        }
+        .active-view { display: flex; } 
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* BERANDA (HOME) STYLES */
+        .hero-card {
+            background: var(--gradient-green);
+            border-radius: 20px;
+            padding: 22px;
+            color: #fff;
+            margin-bottom: 20px;
+            box-shadow: 0 6px 18px rgba(46, 125, 50, 0.25);
+            position: relative;
+            overflow: hidden;
+        }
+        .hero-card h2 { margin: 0; font-size: 19px; font-weight: 700; }
+        .hero-card p { font-size: 12.5px; opacity: 0.95; margin: 8px 0 0; line-height: 1.5; }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .stat-item {
+            background: #fff;
+            padding: 14px 10px;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+            border: 1px solid rgba(0,0,0,0.02);
+        }
+        .stat-item span { display: block; font-size: 10px; color: #777; margin-top: 5px; font-weight: 600; }
+        .stat-item b { font-size: 18px; }
+        .stat-item.org b { color: var(--organic); }
+        .stat-item.anorg b { color: var(--anorganic); }
+        .stat-item.b3-card b { color: var(--b3); }
+
+        .guide-box {
+            background: #fff;
+            border-radius: 18px;
+            padding: 18px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+        }
+        .guide-step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+        .step-num {
+            width: 26px; height: 26px; background: var(--light-green);
+            color: var(--primary-green); border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 12px; margin-right: 14px;
+        }
+        .step-text { font-size: 12.5px; color: #444; font-weight: 500; }
+
+        /* SCANNER STYLES */
+        .scan-hint-box {
+            background-color: #fff;
+            border-radius: 16px;
+            padding: 14px 16px;
+            margin-bottom: 15px;
+            text-align: left;
+            border-left: 5px solid var(--primary-green);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+        }
+        .scan-hint-box h4 { margin: 0 0 4px 0; font-size: 14px; color: var(--primary-green); font-weight: 700; }
+        .scan-hint-box p { margin: 0; font-size: 12px; color: #555; line-height: 1.4; }
+
+        .scanner-wrapper {
+            position: relative;
+            margin: 10px auto 25px;
+            width: 280px; height: 280px;
+            border-radius: 32px; overflow: hidden;
+            background: #000;
+            box-shadow: 0 10px 25px rgba(46, 125, 50, 0.15);
+        }
+        .scanner-overlay {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            border: 15px solid rgba(255, 255, 255, 0.15); pointer-events: none;
+        }
+        .corner { position: absolute; width: 22px; height: 22px; border: 4.5px solid #00e676; }
+        
+        #hasil-scan {
+            font-size: 20px; font-weight: 800; padding: 18px;
+            border-radius: 18px; background: #e0e0e0; text-align: center;
+            letter-spacing: 0.5px; color: #444;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .ORGANIK { background: var(--organic) !important; color: #fff !important; box-shadow: 0 6px 20px rgba(76, 175, 80, 0.35) !important; }
+        .ANORGANIK { background: var(--anorganic) !important; color: #fff !important; box-shadow: 0 6px 20px rgba(33, 150, 243, 0.35) !important; }
+        .B3 { background: var(--b3) !important; color: #fff !important; box-shadow: 0 6px 20px rgba(244, 67, 54, 0.35) !important; }
+
+        /* MATERI STYLES */
+        .materi-card {
+            background: #fff; border-radius: 16px; padding: 16px;
+            margin-bottom: 15px; border-left: 5px solid #ccc;
+        }
+        .materi-card h4 { margin: 0 0 6px; font-size: 16px; font-weight: 700; }
+        .materi-card p { margin: 0; font-size: 12.5px; color: #555; line-height: 1.5; }
+
+        /* VIDEO STYLES */
+        .video-link {
+            text-decoration: none;
+            display: block;
+            margin-bottom: 18px;
+        }
+        .video-item {
+            background: #000; border-radius: 18px; height: 180px;
+            position: relative; overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+            background-size: cover; background-position: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease;
+        }
+        .video-link:hover .video-item {
+            transform: scale(1.02);
+        }
+        .video-item::after {
+            content: '▶'; color: #fff; font-size: 32px;
+            background: rgba(46, 125, 50, 0.9); width: 55px; height: 55px;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            padding-left: 4px; box-sizing: border-box;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .video-label {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.85)); color: #fff;
+            padding: 15px 16px 12px; font-size: 13px; font-weight: 600;
+        }
+
+        /* FLOATING FOOTER */
+        .bottom-nav {
+            position: absolute; bottom: 12px; left: 14px; right: 14px;
+            height: 72px; background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            border-radius: 22px; display: flex; justify-content: space-around; align-items: center;
+            box-shadow: 0 8px 25px rgba(27, 58, 30, 0.08); border: 1px solid rgba(255,255,255,0.5); z-index: 100;
+        }
+        .nav-item {
+            flex: 1; display: flex; flex-direction: column; align-items: center; font-size: 9px;
+            color: #999; cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            font-weight: 700; position: relative; height: 100%; justify-content: center;
+        }
+        .nav-icon { font-size: 20px; margin-bottom: 4px; transition: transform 0.25s ease; }
+        .nav-item.active { color: var(--primary-green); }
+        .nav-item.active .nav-icon { transform: translateY(-2px) scale(1.15); }
+        .nav-item.active::after {
+            content: ''; position: absolute; bottom: 8px; width: 5px; height: 5px; background-color: var(--primary-green); border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <div class="app-header">
+            <div class="status-bar-mock">
+                <span>09:41</span>
+                <span>📶 🪫 100%</span>
+            </div>
+            <div class="header-main">
+                <div class="header-logo">🍃</div>
+                <div class="header-text">
+                    <h1>Smart Waste Identification</h1>
+                    <p>SDN Gondang 1</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-home" class="view-section active-view">
+            <div class="hero-card">
+                <h2>Halo Sobat Hijau! 🌿</h2>
+                <p>Siap menjadi Pahlawan Lingkungan hari ini? Mari jaga SDN Gondang 1 tetap bersih!</p>
+            </div>
+
+            <div class="stat-grid">
+                <div class="stat-item org"><b>12</b><span>Organik</span></div>
+                <div class="stat-item anorg"><b>8</b><span>Anorganik</span></div>
+                <div class="stat-item b3-card"><b>2</b><span>B3</span></div>
+            </div>
+
+            <div class="guide-box">
+                <h4 style="margin:0 0 15px; color:var(--primary-green); font-weight:700;">Cara Pakai SWAI:</h4>
+                <div class="guide-step">
+                    <div class="step-num">1</div>
+                    <div class="step-text">Buka menu <b>Cari Tahu Aku</b></div>
+                </div>
+                <div class="guide-step">
+                    <div class="step-num">2</div>
+                    <div class="step-text">Arahkan kamera ke sampah</div>
+                </div>
+                <div class="guide-step">
+                    <div class="step-num">3</div>
+                    <div class="step-text">Buang ke tempat sampah yang sesuai!</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-scan" class="view-section">
+            <h3 style="color:var(--primary-green); margin-top:0; margin-bottom: 12px; font-weight:700;">Cari Tahu Aku 📷</h3>
+            
+            <div class="scan-hint-box">
+                <h4>Detektor Sampah Pintar</h4>
+                <p>Dekatkan objek sampah ke kamera. Tunggu mesin cerdas membaca kategorinya, lalu buanglah ke tempat sampah sewarna ya!</p>
+            </div>
+
+            <div class="scanner-wrapper">
+                <div id="webcam-container"></div>
+                <div class="scanner-overlay">
+                    <div class="corner" style="top:10px; left:10px; border-width: 4px 0 0 4px; border-radius: 12px 0 0 0;"></div>
+                    <div class="corner" style="top:10px; right:10px; border-width: 4px 4px 0 0; border-radius: 0 12px 0 0;"></div>
+                    <div class="corner" style="bottom:10px; left:10px; border-width: 0 0 4px 4px; border-radius: 0 0 0 12px;"></div>
+                    <div class="corner" style="bottom:10px; right:10px; border-width: 0 4px 4px 0; border-radius: 0 0 12px 0;"></div>
+                </div>
+            </div>
+            <div id="hasil-scan">Membuka Kamera...</div>
+        </div>
+
+        <div id="view-materi" class="view-section">
+            <h3 style="color:var(--primary-green); margin-top:0; margin-bottom: 15px; font-weight:700;">Materi Pengelolaan</h3>
+            <div class="materi-card" style="border-left-color: var(--organic);">
+                <h4 style="color: var(--organic);">🟢 Sampah Organik</h4>
+                <p>Sampah sisa makanan, daun, dan ranting. Bisa diolah menjadi kompos untuk menyuburkan tanaman sekolah.</p>
+            </div>
+            <div class="materi-card" style="border-left-color: var(--anorganic);">
+                <h4 style="color: var(--anorganic);">🔵 Sampah Anorganik</h4>
+                <p>Plastik, kertas, botol, dan kaleng. Masukkan ke Bank Sampah SDN Gondang 1 untuk didaur ulang!</p>
+            </div>
+            <div class="materi-card" style="border-left-color: var(--b3);">
+                <h4 style="color: var(--b3);">🔴 Sampah B3</h4>
+                <p>Baterai bekas, lampu rusak, dan kabel. Berbahaya bagi lingkungan, harus dibuang di wadah khusus.</p>
+            </div>
+        </div>
+
+        <div id="view-video" class="view-section">
+            <h3 style="color:var(--primary-green); margin-top:0; margin-bottom: 15px; font-weight:700;">Video Edukasi 🎥</h3>
+            
+            <a href="https://youtu.be/H5zhplPua4E?si=zNbBxdxJJOJutbua" target="_blank" class="video-link">
+                <div class="video-item" style="background-image: url('https://img.youtube.com/vi/H5zhplPua4E/mqdefault.jpg');">
+                    <div class="video-label">Pentingnya Memilah Sampah</div>
+                </div>
+            </a>
+
+            <a href="https://youtu.be/qi-e_NWao28?si=2lvvc-HAiXfPXTzZ" target="_blank" class="video-link">
+                <div class="video-item" style="background-image: url('https://img.youtube.com/vi/qi-e_NWao28/mqdefault.jpg');">
+                    <div class="video-label">Cara Membuat Kompos Sederhana</div>
+                </div>
+            </a>
+        </div>
+
+        <div class="bottom-nav">
+            <div class="nav-item active" onclick="showView('home', this)">
+                <span class="nav-icon">🏠</span><span>Beranda</span>
+            </div>
+            <div class="nav-item" onclick="showView('scan', this)">
+                <span class="nav-icon">📷</span><span>Cari Tahu Aku</span>
+            </div>
+            <div class="nav-item" onclick="showView('materi', this)">
+                <span class="nav-icon">📊</span><span>Materi</span>
+            </div>
+            <div class="nav-item" onclick="showView('video', this)">
+                <span class="nav-icon">🎥</span><span>Video</span>
+            </div>
+        </div>
+    </div>
+
+<script type="text/javascript">
+    const URL = "https://teachablemachine.withgoogle.com/models/YwSIagLlK/"; 
+    let model, webcam, hasilContainer, maxPredictions;
+    let isCameraRunning = false;
+    
+    let terakhirDiucapkan = "";
+    let waktuBicaraTerakhir = 0;
+
+    function showView(viewName, element) {
+        document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active-view'));
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        
+        document.getElementById('view-' + viewName).classList.add('active-view');
+        element.classList.add('active');
+
+        if(viewName === 'scan' && !isCameraRunning) {
+            initCamera();
+        }
+    }
+
+    async function initCamera() {
+        try {
+            isCameraRunning = true;
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            model = await tmImage.load(modelURL, metadataURL);
+            maxPredictions = model.getTotalClasses();
+
+            webcam = new tmImage.Webcam(280, 280, false); 
+            await webcam.setup({ facingMode: "environment" }); 
+            await webcam.play();
+            window.requestAnimationFrame(loop);
+
+            document.getElementById("webcam-container").innerHTML = "";
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            hasilContainer = document.getElementById("hasil-scan");
+            hasilContainer.innerHTML = "Mencari Objek...";
+        } catch (e) {
+            document.getElementById("hasil-scan").innerHTML = "Eror Kamera";
+            isCameraRunning = false;
+        }
+    }
+
+    async function loop() {
+        webcam.update(); 
+        await predict();
+        window.requestAnimationFrame(loop);
+    }
+
+    function keluarkanSuara(teks) {
+        const waktuSekarang = Date.now();
+        if (teks !== terakhirDiucapkan || (waktuSekarang - waktuBicaraTerakhir > 4000)) {
+            window.speechSynthesis.cancel();
+            const ucapan = new SpeechSynthesisUtterance(teks);
+            ucapan.lang = 'id-ID'; 
+            ucapan.rate = 1.0;     
+            window.speechSynthesis.speak(ucapan);
+            terakhirDiucapkan = teks;
+            waktuBicaraTerakhir = waktuSekarang;
+        }
+    }
+
+    async function predict() {
+        const prediction = await model.predict(webcam.canvas);
+        let bestMatch = { name: "", score: 0 };
+
+        for (let i = 0; i < maxPredictions; i++) {
+            if (prediction[i].probability > bestMatch.score) {
+                bestMatch.score = prediction[i].probability;
+                bestMatch.name = prediction[i].className;
+            }
+        }
+
+        if (bestMatch.score > 0.55) {
+            const namaKategori = bestMatch.name.toUpperCase();
+            hasilContainer.innerHTML = namaKategori;
+            hasilContainer.className = namaKategori;
+            keluarkanSuara(bestMatch.name);
+        } else {
+            hasilContainer.innerHTML = "Mencari Objek...";
+            hasilContainer.className = "";
+            terakhirDiucapkan = ""; 
+        }
+    }
+</script>
+</body>
+</html>
